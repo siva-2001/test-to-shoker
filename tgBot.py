@@ -19,7 +19,7 @@ def get_posts():
     except eventlet.timeout.Timeout:
         logging.warning("Got Timeout while ")
     except:
-        logging.error("Error in get posts from VK")
+        logging.warning("Error in get posts from VK")
     finally:
         timeout.cancel()
 
@@ -47,7 +47,10 @@ def send_new_posts(posts_dictionary):
     # try block
 
 def check_new_posts():
+    pass
 
+def get_video_url(owner_id, video_id):
+    pass
 
 
 send_new_posts(get_posts())
