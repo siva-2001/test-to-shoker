@@ -2,6 +2,7 @@ import logging
 import time
 import config
 import tgBot
+import dbm
 
 if __name__ == '__main__':
     logging.basicConfig(format='[%(asctime)s] %(filename)s:%(lineno)d %(levelname)s - %(message)s', level=logging.INFO,
@@ -14,3 +15,4 @@ if __name__ == '__main__':
         logging.info('[App] Script went to sleep.')
         time.sleep(60 * config.TIMESTEP)
     logging.info('[App] Script exited.\n')
+

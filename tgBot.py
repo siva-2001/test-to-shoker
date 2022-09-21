@@ -4,9 +4,8 @@ import requests
 import logging
 import telebot
 import config
-from bs4 import BeautifulSoup
-from fake_useragent import UserAgent
 import urllib
+import dbm
 
 
 
@@ -39,20 +38,22 @@ def get_posts(domain):
     finally:
         timeout.cancel()
 
+
+'''
+    send_new_posts() в каждом  полученном посте обрабатывает текст поста и всевозможные прикреплённые файлы,
+    отправляет их в тг-канал. Фотографии группируются, для остальных типов такая возможность не поддерживается.
+'''
 def send_new_posts(posts, channel):
-    for post in posts:
+    for iter, post in enumerate(posts):
         text = post['text']
         photo_group = list()
-        doc_group = list()
 
         if 'geo' in post.keys():
             coords = post['geo']['coordinates'].split(' ')
             latitude, longitude = coords
             bot.send_location(channel, latitude, longitude)
 
-        if 'attachments' not in post.keys():
-            bot.send_message(channel, text)
-        else:
+        if 'attachments' in post.keys():
             for number, attach in enumerate(post['attachments']):
                 if number > 10:
                     break
@@ -73,14 +74,16 @@ def send_new_posts(posts, channel):
                         bot.send_video(channel, attach["doc"]['url'])
                     else:
                         document_url = urllib.request.urlopen(''.join(attach['doc']['url'].split('\\')))
-                        bot.send_document(chat_id=channel,document=document_url, visible_file_name=attach['doc']['title'])
+                        bot.send_document(chat_id=channel, document=document_url,
+                                          visible_file_name=attach['doc']['title'], caption=text)
                 elif attach['type'] == 'poll':
                     question = attach['poll']['question']
                     answer_list = [answer['text'] for answer in attach['poll']['answers']]
                     bot.send_poll(channel, question, answer_list)
-            bot.send_media_group(channel, photo_group)
-
-        time.sleep(1)
+            if len(photo_group) != 0:
+                bot.send_media_group(channel, photo_group)
+        else:
+            bot.send_message(channel, text)
     return
 
 
@@ -91,9 +94,9 @@ def send_new_posts(posts, channel):
 def check_new_posts(club_domain, channel):
     posts = get_posts(club_domain)
     try:
-        with open('VK_club_last_post_id/'+str(club_domain)+'.txt', 'rt') as file:
+        with dbm.open('VK_club_last_post_id', 'c') as storage:
             # извлекаем id последних опубликованных постов
-            last_posts_id = [int(lpid) for lpid in file.read().split(',')]
+            last_posts_id = [int(lpid) for lpid in str(storage[club_domain])[2:-1].split(', ')]
         if posts is not None:
             posts_to_sending = []
             for post in posts:
@@ -101,28 +104,23 @@ def check_new_posts(club_domain, channel):
                     # если пост ещё не был опубликован - сохраняем его данные в post_to_sending
                     posts_to_sending.append(post)
                     last_posts_id.append(post['id'])
-            with open('VK_club_last_post_id/'+str(club_domain)+'.txt', 'wt') as file:
+            with dbm.open('VK_club_last_post_id', 'c') as storage:
                 #  перезаписываем файл с id последних постов
                 last_posts_id.sort(reverse=True)
-                file.write(str(last_posts_id[:config.COUNT_OF_POSTS])[1:-1])
+                storage[club_domain] = str(last_posts_id[:config.COUNT_OF_POSTS])[1:-1]
             # Отправляем посты в хронологическом порядке
             posts_to_sending.reverse()
             send_new_posts(posts_to_sending, channel)
         return
-
-    except FileNotFoundError:
-        logging.error(f'File with last post id for {str(club_domain).upper()} club not exitst: skip iteration, file will be created')
-        posts_id = list()
-        for post in posts:
-            posts_id.append(post['id'])
-        with open('VK_club_last_post_id/'+str(club_domain)+'.txt', 'wt') as file:
-            file.write(str(min(posts_id)))
-        return "Created new file"
     except ValueError:
         logging.error("file storage is corrupted")
         return
+    except KeyError:
+        with dbm.open('VK_club_last_post_id', 'c') as storage:
+            storage[club_domain] = '0'
+        return "Created new file"
     except Exception as ex:
-        logging.error(f"{type(ex).__name__}, {str(ex)}")
+        logging.error(f"{type(ex).__name__}, {str(ex)}, {ex}")
         return
 
 """
@@ -137,39 +135,4 @@ def get_video_player_url(owner_id, video_id, video_key):
         'v':config.VK_API_VERSION,
     }).json()
     return data['response']['items'][0]['player']
-
-# def get_video_url(player_url):
-#     user_agent = UserAgent()
-#     header =  {
-#         'user-agent':user_agent.chrome,
-#         'sec-ch-ua': '"Chromium";v="105", "Not)A;Brand";v="8"',
-#         'sec-ch-ua-mobile':'?0',
-#         'sec-ch-ua-platform':"Linux",
-#     }
-#     htmlContent = requests.get(player_url).text
-#     #print(htmlContent)
-#     soup = BeautifulSoup(htmlContent, 'lxml')
-#     video_url = soup.find('a', id='movie_player')
-#     print(video_url)
-#     return
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
