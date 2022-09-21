@@ -12,11 +12,11 @@ import urllib
 
 bot = telebot.TeleBot(config.TG_BOT_TOKEN)
 
+'''
+    get_posts() озвращает последние посты из VK группы, прерывает выполнение в если
+    ответа нет больше определённого в config.TIMEOUT времени
+'''
 def get_posts(domain):
-    #   ----------------------------------------------------------------------------------------------------------------
-    #   Возвращает последние посты из VK группы, прерывает выполнение в если
-    #   ответа нет больше определённого в config.TIMEOUT времени
-    #   ----------------------------------------------------------------------------------------------------------------
     timeout = eventlet.Timeout(config.TIMEOUT)
     try:
         params = {
@@ -45,10 +45,15 @@ def send_new_posts(posts, channel):
         text = post['text']
         photo_group = list()
         doc_group = list()
-        video_group = list()
+
+
+        if 'geo' in post.keys():
+            coords = post['geo']['coordinates'].split(' ')
+            latitude, longitude = coords
+            bot.send_location(channel, latitude, longitude)
 
         if 'attachments' not in post.keys():
-            bot.send_message(config.TG_CHANNEL, text)
+            bot.send_message(channel, text)
         else:
             for number, attach in enumerate(post['attachments']):
                 if number > 10:
@@ -59,48 +64,60 @@ def send_new_posts(posts, channel):
                 if attach['type'] == 'photo':
                     photo_group.append(telebot.types.InputMediaPhoto(attach['photo']['sizes'][-1]['url'], text))
                 elif attach['type'] == 'video':
-                    pass
                     video_player_url = get_video_player_url(
                         attach['video']['owner_id'],
                         attach['video']['id'],
                         attach['video']['access_key']
                     )
-                    bot.send_message(channel, video_player_url,)
-
+                    bot.send_message(channel, attach['video']['title'] + '\n\n' + video_player_url)
                 elif attach['type'] == 'doc':
-                    document_url = urllib.request.urlopen(''.join(attach['doc']['url'].split('\\')))
-                    doc_group.append(document_url)
-                    bot.send_document(chat_id=channel,document=document_url, visible_file_name=attach['doc']['title'])
-                    # Обработка слишком большого файла
-
+                    if attach['doc']['ext'] == 'gif':
+                        bot.send_video(channel, attach["doc"]['url'])
+                    else:
+                        document_url = urllib.request.urlopen(''.join(attach['doc']['url'].split('\\')))
+                        bot.send_document(chat_id=channel,document=document_url, visible_file_name=attach['doc']['title'])
+                elif attach['type'] == 'poll':
+                    question = attach['poll']['question']
+                    answer_list = [answer['text'] for answer in attach['poll']['answers']]
+                    bot.send_poll(channel, question, answer_list)
             bot.send_media_group(channel, photo_group)
+
         time.sleep(1)
     return
 
+
+'''
+    check_new_posts проверяет наличие полученных от vk api постов в числе уже размещённых в телеграмм канале,
+    и отправляет ещё не опубликованные в ТГ-канал
+'''
 def check_new_posts(club_domain, channel):
     posts = get_posts(club_domain)
     try:
-        with open('VK_club_last_posts_id/'+str(club_domain)+'.txt', 'rt') as file:
+        with open('VK_club_last_post_id/'+str(club_domain)+'.txt', 'rt') as file:
+            # извлекаем id последних опубликованных постов
             last_posts_id = [int(lpid) for lpid in file.read().split(',')]
         if posts is not None:
             posts_to_sending = []
             for post in posts:
                 if post['id'] not in last_posts_id:
+                    # если пост ещё не был опубликован - сохраняем его данные в post_to_sending
                     posts_to_sending.append(post)
                     last_posts_id.append(post['id'])
-            with open('VK_club_last_posts_id/'+str(club_domain)+'.txt', 'wt') as file:
+            with open('VK_club_last_post_id/'+str(club_domain)+'.txt', 'wt') as file:
+                #  перезаписываем файл с id последних постов
                 last_posts_id.sort(reverse=True)
                 file.write(str(last_posts_id[:config.COUNT_OF_POSTS])[1:-1])
+            # Отправляем посты в хронологическом порядке
             posts_to_sending.reverse()
             send_new_posts(posts_to_sending, channel)
         return
 
-    except FileNotFoundError as ex:
+    except FileNotFoundError:
         logging.error(f'File with last post id for {str(club_domain).upper()} club not exitst: skip iteration, file will be created')
         posts_id = list()
         for post in posts:
             posts_id.append(post['id'])
-        with open('VK_club_last_posts_id/'+str(club_domain)+'.txt', 'wt') as file:
+        with open('VK_club_last_post_id/'+str(club_domain)+'.txt', 'wt') as file:
             file.write(str(min(posts_id)))
         return "Created new file"
     except ValueError:
@@ -145,10 +162,7 @@ def get_video_url(player_url):
 
 
 
-send_new_posts(get_posts("testclubforinterview"),'@testChannelForMyIBot')
-
-
-
+#send_new_posts(get_posts("testclubforinterview"),'@testChannelForMyIBot')
 #check_new_posts(config.DOMAIN)
 #send_new_posts(get_posts())
 #get_video_player_url(258450864, 456239554, '55046c56ad3a5f8f1b')
