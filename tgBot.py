@@ -28,14 +28,13 @@ def get_posts(domain):
             params['domain'] = domain
         elif type(domain) == int:
             params['owner_id'] = str(-domain)
-
         data_str = requests.get(config.VK_API_CLUB_URL, params=params)
         return data_str.json()['response']['items']
     except eventlet.timeout.Timeout:
         logging.warning("Got Timeout while retrieving vk JSON data")
         return None
-    except:
-        logging.warning("Error in get posts from VK")
+    except Exception as ex:
+        logging.warning(f"Error in get posts from VK: {ex}")
         return  None
     finally:
         timeout.cancel()
@@ -45,7 +44,6 @@ def send_new_posts(posts, channel):
         text = post['text']
         photo_group = list()
         doc_group = list()
-
 
         if 'geo' in post.keys():
             coords = post['geo']['coordinates'].split(' ')
@@ -127,10 +125,10 @@ def check_new_posts(club_domain, channel):
         logging.error(f"{type(ex).__name__}, {str(ex)}")
         return
 
+"""
+        Возврат URL'a плеера того ресурса, на котором находится файл
+"""
 def get_video_player_url(owner_id, video_id, video_key):
-    #   ----------------------------------------------------------------------------------------------------------------
-    #   Возврат URL'a плеера того ресурса, на котором находится файл
-    #   ----------------------------------------------------------------------------------------------------------------
     data = requests.get(config.VK_API_VIDEO_URL, params={
         "access_token":config.VK_ACCESS_TOKEN,
         'videos':(str(owner_id)+'_'+str(video_id)+"_"+video_key),
@@ -138,35 +136,24 @@ def get_video_player_url(owner_id, video_id, video_key):
         'count':config.COUNT_OF_POSTS,
         'v':config.VK_API_VERSION,
     }).json()
-    print(data['response']['items'][0]['player'])
     return data['response']['items'][0]['player']
 
-def get_video_url(player_url):
-    user_agent = UserAgent()
-    header =  {
-        'user-agent':user_agent.chrome,
-        'sec-ch-ua': '"Chromium";v="105", "Not)A;Brand";v="8"',
-        'sec-ch-ua-mobile':'?0',
-        'sec-ch-ua-platform':"Linux",
-    }
-    htmlContent = requests.get(player_url).text
-    #print(htmlContent)
-    soup = BeautifulSoup(htmlContent, 'lxml')
-    video_url = soup.find('a', id='movie_player')
-    print(video_url)
-    return
+# def get_video_url(player_url):
+#     user_agent = UserAgent()
+#     header =  {
+#         'user-agent':user_agent.chrome,
+#         'sec-ch-ua': '"Chromium";v="105", "Not)A;Brand";v="8"',
+#         'sec-ch-ua-mobile':'?0',
+#         'sec-ch-ua-platform':"Linux",
+#     }
+#     htmlContent = requests.get(player_url).text
+#     #print(htmlContent)
+#     soup = BeautifulSoup(htmlContent, 'lxml')
+#     video_url = soup.find('a', id='movie_player')
+#     print(video_url)
+#     return
 
 
-
-
-
-
-
-#send_new_posts(get_posts("testclubforinterview"),'@testChannelForMyIBot')
-#check_new_posts(config.DOMAIN)
-#send_new_posts(get_posts())
-#get_video_player_url(258450864, 456239554, '55046c56ad3a5f8f1b')
-#get_video_url(get_video_player_url(258450864, 456239554, '55046c56ad3a5f8f1b'))
 
 
 
