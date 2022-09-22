@@ -5,6 +5,7 @@ VK_API_VIDEO_URL = 'https://api.vk.com/method/video.get'
 
 TG_CHANNEL = '@testChannelForMyIBot'
 
+WITH_ADS = False
 
 COUNT_OF_POSTS = 10
 # Количество запрашиваемых постов. При частом постингое должно быть увеличено, либо уменьшен TIMESTEP
@@ -20,14 +21,12 @@ TIMEOUT = 8
 VK_API_VERSION = 5.131
 
 
-#   token was added at 17:00
-#   change in release
+
 VK_ACCESS_TOKEN = os.environ.get("VK_ACCESS_TOKEN")
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
 
 #
 VK_CLUB_TG_CHANNEL_PAIRS = [
-    ('testclubforinterview','@testChannelForMyIBot'),
-    #('42tomsk','@testChannelForMyIBot'),
-    #(196133541,'@testChannelForMyIBot')
+    #('aasdfanno','@testChannelForMyIBot'),
+    ('42tomsk','@testChannelForMyIBot'),
 ]
