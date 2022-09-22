@@ -60,6 +60,11 @@ def send_new_posts(posts, channel):
                 if number >= 10:
                     logging.warning('post have most then 10 attach')
                     break
+
+                if attach['type'] == 'link':
+                    url = attach['link']['url']
+                    bot.send_message(channel, url)
+
                 if attach['type'] == 'photo':
                     photo_group.append(telebot.types.InputMediaPhoto(attach['photo']['sizes'][-1]['url'], text))
                     text = None
@@ -93,7 +98,8 @@ def send_new_posts(posts, channel):
             if text is not None and len(text) != 0:
                 bot.send_message(channel, text)
         else:
-            bot.send_message(channel, text)
+            if text is not None and len(text) != 0:
+                bot.send_message(channel, text)
     return
 
 
@@ -110,7 +116,7 @@ def check_new_posts(club_domain, channel):
         if posts is not None:
             posts_to_sending = []
             for post in posts:
-                if post['id'] not in last_posts_id:
+                if post['id'] > last_posts_id[1] and post['id'] != last_posts_id[0]:
                     # если пост ещё не был опубликован - сохраняем его данные в post_to_sending
                     posts_to_sending.append(post)
                     last_posts_id.append(post['id'])
@@ -127,7 +133,7 @@ def check_new_posts(club_domain, channel):
         return
     except KeyError:
         with dbm.open('VK_club_last_post_id', 'c') as storage:
-            storage[club_domain] = '0'
+            storage[club_domain] = '1, 0'
         return "Created new file"
     except Exception as ex:
         logging.error(f"{type(ex).__name__}, {str(ex)}, {ex}")
