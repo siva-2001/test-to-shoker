@@ -1,4 +1,3 @@
-import time
 import eventlet
 import requests
 import logging
@@ -48,40 +47,51 @@ def send_new_posts(posts, channel):
         text = post['text']
         photo_group = list()
 
+        #   Обработка геометки
         if 'geo' in post.keys():
             coords = post['geo']['coordinates'].split(' ')
             latitude, longitude = coords
             bot.send_location(channel, latitude, longitude)
 
+        #   Обработка других вложений
         if 'attachments' in post.keys():
             for number, attach in enumerate(post['attachments']):
-                if number > 10:
+
+                if number >= 10:
+                    logging.warning('post have most then 10 attach')
                     break
-                if number != 0:
-                    # Для корректного отображения текста при множестве файлов он должен быть прикреплён только к первому
-                    text = None
                 if attach['type'] == 'photo':
                     photo_group.append(telebot.types.InputMediaPhoto(attach['photo']['sizes'][-1]['url'], text))
+                    text = None
                 elif attach['type'] == 'video':
                     video_player_url = get_video_player_url(
                         attach['video']['owner_id'],
                         attach['video']['id'],
                         attach['video']['access_key']
                     )
-                    bot.send_message(channel, attach['video']['title'] + '\n\n' + video_player_url)
+                    if text is not None: post_text_to_video = text + '\n\n'
+                    else: post_text_to_video = ''
+                    bot.send_message(channel, post_text_to_video + attach['video']['title'] +
+                                     "\n" +'Открыть в ВК плеере:' +'\n' + video_player_url)
+                    text = None
                 elif attach['type'] == 'doc':
                     if attach['doc']['ext'] == 'gif':
                         bot.send_video(channel, attach["doc"]['url'])
                     else:
-                        document_url = urllib.request.urlopen(''.join(attach['doc']['url'].split('\\')))
+                        document_url = urllib.request.urlopen(attach['doc']['url'])
                         bot.send_document(chat_id=channel, document=document_url,
                                           visible_file_name=attach['doc']['title'], caption=text)
+                        text = None
                 elif attach['type'] == 'poll':
                     question = attach['poll']['question']
                     answer_list = [answer['text'] for answer in attach['poll']['answers']]
                     bot.send_poll(channel, question, answer_list)
+            #  Отправляем изображения группой
             if len(photo_group) != 0:
                 bot.send_media_group(channel, photo_group)
+            # если есть вложения, но это не фото и не документы - отправляем текст отдельным сообщением:
+            if text is not None and len(text) != 0:
+                bot.send_message(channel, text)
         else:
             bot.send_message(channel, text)
     return
