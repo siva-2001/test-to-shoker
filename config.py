@@ -1,5 +1,4 @@
 import os
-import logging
 
 VK_API_CLUB_URL = f'https://api.vk.com/method/wall.get'
 VK_API_VIDEO_URL = 'https://api.vk.com/method/video.get'
@@ -27,7 +26,7 @@ VK_ACCESS_TOKEN = os.environ.get("VK_ACCESS_TOKEN")
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
 
 #
-VK_CLUB_TG_CHANNEL = [
+VK_CLUB_TG_CHANNEL_PAIRS = [
     ('testclubforinterview','@testChannelForMyIBot'),
     #('42tomsk','@testChannelForMyIBot'),
     #(196133541,'@testChannelForMyIBot')
