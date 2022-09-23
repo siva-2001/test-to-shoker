@@ -9,32 +9,8 @@ import time
 
 
 bot = telebot.TeleBot(config.TG_BOT_TOKEN)
-#bot.polling(none_stop=True)
 
-'''
-    get_posts() озвращает последние посты из VK группы, прерывает выполнение в если
-    ответа нет больше определённого в config.TIMEOUT времени
-'''
-def get_posts(domain):
-    timeout = eventlet.Timeout(config.TIMEOUT)
-    try:
-        params = {
-            'count': config.COUNT_OF_POSTS,
-            'access_token': config.VK_ACCESS_TOKEN,
-            'v': config.VK_API_VERSION
-        }
-        if type(domain) == str: params['domain'] = domain
-        elif type(domain) == int: params['owner_id'] = str(-domain)
-        data_str = requests.get(config.VK_API_CLUB_URL, params=params)
-        return data_str.json()['response']['items']
-    except eventlet.timeout.Timeout:
-        logging.warning("Got Timeout while retrieving vk JSON data")
-        return None
-    except Exception as ex:
-        logging.warning(f"Error in get posts from VK: {ex}")
-        return  None
-    finally:
-        timeout.cancel()
+
 
 
 '''
@@ -43,34 +19,23 @@ def get_posts(domain):
 '''
 def send_new_posts(posts, channel):
     for iter, post in enumerate(posts):
-        #   Отключение / включение рекламы
-        if post["marked_as_ads"] == 1 and not config.WITH_ADS: continue
-
+        if post["marked_as_ads"] == 1 and not config.WITH_ADS: continue         #   Отключение / включение рекламы
         try:
             text = post['text']
             photo_group = list()
-
-            if len(text) >=200:
-                # API не позволяет прикрепить текст к файлам если он более 200 символов
-                text_to_send = text
+            if len(text) > 750:             # API не позволяет прикрепить текст к файлам если он более n символов
+                text_to_send = text         # n в документации не прописано
                 text = None
             else: text_to_send = None
-
-            #   Обработка геометки
-            if 'geo' in post.keys():
+            if 'geo' in post.keys():                                        #   Обработка геометки
                 coords = post['geo']['coordinates'].split(' ')
                 latitude, longitude = coords
                 bot.send_location(channel, latitude, longitude)
-
-            #   Обработка других вложений
-            if 'attachments' in post.keys():
+            if 'attachments' in post.keys():                                #   Обработка и отправка других вложений
                 for number, attach in enumerate(post['attachments']):
-
                     if number >= 10:
                         logging.warning('Ошибка на стороне VK-api: прислано более 10 вложений')
                         break
-
-                    # Обрабатываем группировку/отпраку вложения
                     if attach['type'] == 'photo':
                         photo_group.append(telebot.types.InputMediaPhoto(attach['photo']['sizes'][-1]['url'], text))
                         text = None
@@ -97,22 +62,18 @@ def send_new_posts(posts, channel):
                         question = attach['poll']['question']
                         answer_list = [answer['text'] for answer in attach['poll']['answers']]
                         bot.send_poll(channel, question, answer_list)
-                #  Отправляем изображения группой
-                if len(photo_group) != 0:
+                if len(photo_group) != 0:       #  Отправляем изображения группой
                     bot.send_media_group(channel, photo_group)
-
                 if text_to_send is not None:
                     text = text_to_send
-
             if text is not None and len(text) != 0:
                 bot.send_message(channel, text)
-
             logging.info(f"VK post with id{post['id']} from owner_id={post['owner_id']} was sent")
         except Exception as ex:
             logging.warning(f'Error "{ex}" of send post id{post["id"]} from owner_id={post["owner_id"]} . Переход к следующему...')
         finally:
             # Ждём, чтобы telegram-api не заблокировал за большое кол-во запросов
-            time.sleep(45)
+            time.sleep(32)
     return
 
 
@@ -121,13 +82,6 @@ def send_new_posts(posts, channel):
     и отправляет ещё не опубликованные в ТГ-канал
 '''
 def check_new_posts(club_domain, channel):
-
-    # для реакции бота на команды start and stop
-    # тайм аут, в try обработка сообщений, в except блоке весь код ниже:
-    # включить поллинг
-    # метод в конце файла
-    # return BOOLEAN состояние работы
-
     posts = get_posts(club_domain)
     try:
         with dbm.open('VK_club_last_post_id', 'c') as storage:
@@ -159,6 +113,31 @@ def check_new_posts(club_domain, channel):
         logging.error(f"{type(ex).__name__}, {str(ex)}, {ex}")
         return
 
+'''
+    get_posts() озвращает последние посты из VK группы, прерывает выполнение в если
+    ответа нет больше определённого в config.TIMEOUT времени
+'''
+def get_posts(domain):
+    timeout = eventlet.Timeout(config.TIMEOUT)
+    try:
+        params = {
+            'count': config.COUNT_OF_POSTS,
+            'access_token': config.VK_ACCESS_TOKEN,
+            'v': config.VK_API_VERSION
+        }
+        if type(domain) == str: params['domain'] = domain
+        elif type(domain) == int: params['owner_id'] = str(-domain)
+        data_str = requests.get(config.VK_API_CLUB_URL, params=params)
+        return data_str.json()['response']['items']
+    except eventlet.timeout.Timeout:
+        logging.warning("Got Timeout while retrieving vk JSON data")
+        return None
+    except Exception as ex:
+        logging.warning(f"Error in get posts from VK: {ex}")
+        return  None
+    finally:
+        timeout.cancel()
+
 """
         Возврат URL'a плеера того ресурса, на котором находится файл
 """
@@ -171,8 +150,3 @@ def get_video_player_url(owner_id, video_id, video_key):
         'v':config.VK_API_VERSION,
     }).json()
     return data['response']['items'][0]['player']
-
-# @bot.message_handler(commands=['start'])
-# def send_start(message):
-#
-#     if message.chat.type == 'private':
