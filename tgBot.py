@@ -19,7 +19,9 @@ bot = telebot.TeleBot(config.TG_BOT_TOKEN)
 '''
 def send_new_posts(posts, channel):
     for iter, post in enumerate(posts):
-        if post["marked_as_ads"] == 1 and not config.WITH_ADS: continue         #   Отключение / включение рекламы
+        if "marked_as_ads" in post.keys():
+            if post["marked_as_ads"] == 1 and not config.WITH_ADS: continue         #   Отключение / включение рекламы
+
         try:
             text = post['text']
             photo_group = list()
@@ -86,6 +88,8 @@ def check_new_posts(club_domain, channel):
     try:
         with dbm.open('VK_club_last_post_id', 'c') as storage:
             # извлекаем id последних опубликованных постов
+            if type(club_domain) == int:
+                club_domain = str(club_domain)
             last_posts_id = [int(lpid) for lpid in str(storage[club_domain])[2:-1].split(', ')]
         if posts is not None:
             posts_to_sending = []
@@ -126,14 +130,14 @@ def get_posts(domain):
             'v': config.VK_API_VERSION
         }
         if type(domain) == str: params['domain'] = domain
-        elif type(domain) == int: params['owner_id'] = str(-domain)
+        elif type(domain) == int: params['owner_id'] = str(domain)
         data_str = requests.get(config.VK_API_CLUB_URL, params=params)
         return data_str.json()['response']['items']
     except eventlet.timeout.Timeout:
         logging.warning("Got Timeout while retrieving vk JSON data")
         return None
     except Exception as ex:
-        logging.warning(f"Error in get posts from VK: {ex}")
+        logging.warning(f"Error in get posts from VK: \n Response data:\n{data_str['error']}")
         return  None
     finally:
         timeout.cancel()
