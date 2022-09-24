@@ -6,18 +6,17 @@ import config
 import urllib
 import dbm
 import time
+from video_dl import download_video_from_vk
 
 
 bot = telebot.TeleBot(config.TG_BOT_TOKEN)
-
-
-
 
 '''
     send_new_posts() в каждом  полученном посте обрабатывает текст поста и всевозможные прикреплённые файлы,
     отправляет их в тг-канал. Фотографии группируются, для остальных типов такая возможность не поддерживается.
 '''
 def send_new_posts(posts, channel):
+    print(posts)
     for iter, post in enumerate(posts):
         if "marked_as_ads" in post.keys():
             if post["marked_as_ads"] == 1 and not config.WITH_ADS: continue         #   Отключение / включение рекламы
@@ -25,6 +24,7 @@ def send_new_posts(posts, channel):
         try:
             text = post['text']
             photo_group = list()
+            video_group = list()
             if len(text) > 750:             # API не позволяет прикрепить текст к файлам если он более n символов
                 text_to_send = text         # n в документации не прописано
                 text = None
@@ -42,15 +42,20 @@ def send_new_posts(posts, channel):
                         photo_group.append(telebot.types.InputMediaPhoto(attach['photo']['sizes'][-1]['url'], text))
                         text = None
                     elif attach['type'] == 'video':
-                        video_player_url = get_video_player_url(
-                            attach['video']['owner_id'],
-                            attach['video']['id'],
-                            attach['video']['access_key']
-                        )
-                        if text is not None: post_text_to_video = text + '\n\n'
-                        else: post_text_to_video = ''
-                        bot.send_message(channel, post_text_to_video + attach['video']['title'] +
-                                         "\n" +'Открыть в ВК плеере:' +'\n' + video_player_url)
+                        video = attach['video']
+
+                        if 'platform' in video.keys():
+                            if video['platform'] == "YouTube":
+                                player_url = get_video_player_url(
+                                    video['onwer_id'],
+                                    video['id'],
+                                    video['access_key']
+                                )
+
+                        else:
+                            video_path = download_video_from_vk(video['owner_id'], video['id'], video['title'])
+                            with open(video_path, 'rb') as video_file: video_byte_data = video_file.read()
+                            video_group.append(telebot.types.InputMediaVideo(video_byte_data, text))
                         text = None
                     elif attach['type'] == 'doc':
                         if attach['doc']['ext'] == 'gif':
@@ -66,13 +71,16 @@ def send_new_posts(posts, channel):
                         bot.send_poll(channel, question, answer_list)
                 if len(photo_group) != 0:       #  Отправляем изображения группой
                     bot.send_media_group(channel, photo_group)
+                if len(video_group) != 0:       #   Отправляем видео группой
+                    print('here')
+                    bot.send_media_group(channel, video_group)
                 if text_to_send is not None:
                     text = text_to_send
             if text is not None and len(text) != 0:
                 bot.send_message(channel, text)
             logging.info(f"VK post with id{post['id']} from owner_id={post['owner_id']} was sent")
-        except Exception as ex:
-            logging.warning(f'Error "{ex}" of send post id{post["id"]} from owner_id={post["owner_id"]} . Переход к следующему...')
+        # except Exception as ex:
+        #     logging.warning(f'Error "{ex}" of send post id{post["id"]} from owner_id={post["owner_id"]} . Переход к следующему...')
         finally:
             # Ждём, чтобы telegram-api не заблокировал за большое кол-во запросов
             time.sleep(32)
@@ -153,4 +161,5 @@ def get_video_player_url(owner_id, video_id, video_key):
         'count':config.COUNT_OF_POSTS,
         'v':config.VK_API_VERSION,
     }).json()
+    print(data)
     return data['response']['items'][0]['player']

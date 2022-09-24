@@ -1,7 +1,7 @@
 import os
 
 VK_CLUB_TG_CHANNEL_PAIRS = [
-    (189354729,'@testChannelForMyIBot'),
+    ('testclubforinterview','@testChannelForMyIBot'),
 ]
 
 # https://oauth.vk.com/authorize?client_id=#&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope-video,photos&response_type=token&v=5.131
