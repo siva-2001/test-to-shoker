@@ -1,3 +1,4 @@
+import os
 import eventlet
 import requests
 import logging
@@ -6,8 +7,7 @@ import config
 import urllib
 import dbm
 import time
-from video_dl import download_video_from_vk
-
+from video_dl import download_video_from_vk, download_video_from_youtube
 
 bot = telebot.TeleBot(config.TG_BOT_TOKEN)
 
@@ -16,7 +16,6 @@ bot = telebot.TeleBot(config.TG_BOT_TOKEN)
     отправляет их в тг-канал. Фотографии группируются, для остальных типов такая возможность не поддерживается.
 '''
 def send_new_posts(posts, channel):
-    print(posts)
     for iter, post in enumerate(posts):
         if "marked_as_ads" in post.keys():
             if post["marked_as_ads"] == 1 and not config.WITH_ADS: continue         #   Отключение / включение рекламы
@@ -43,19 +42,23 @@ def send_new_posts(posts, channel):
                         text = None
                     elif attach['type'] == 'video':
                         video = attach['video']
-
+                        player_url = get_video_player_url(video['owner_id'], video['id'], video['access_key'])
                         if 'platform' in video.keys():
                             if video['platform'] == "YouTube":
-                                player_url = get_video_player_url(
-                                    video['onwer_id'],
-                                    video['id'],
-                                    video['access_key']
-                                )
-
+                                download_video_from_youtube(player_url)
+                                video_path = 'video_files/' + str(video['title']).translate({ord(","):None}) + '.mp4'
+                                with open(video_path, 'rb') as video_file: video_byte_data = video_file.read()
+                                video_group.append(telebot.types.InputMediaVideo(video_byte_data, caption=text))
+                                os.remove(video_path)
                         else:
-                            video_path = download_video_from_vk(video['owner_id'], video['id'], video['title'])
-                            with open(video_path, 'rb') as video_file: video_byte_data = video_file.read()
-                            video_group.append(telebot.types.InputMediaVideo(video_byte_data, text))
+                            try:
+                                video_path = download_video_from_vk(video['owner_id'], video['id'], video['title'])
+                                with open(video_path, 'rb') as video_file: video_byte_data = video_file.read()
+                                video_group.append(telebot.types.InputMediaVideo(video_byte_data, caption=text))
+                                os.remove(video_path)
+                            except urllib.error.HTTPError:
+                                message = f"Ошибка при загрузке видео с сервера ВКонтакте\nВидео можно открыть по ссылке:\n\n{video['title']}\n{player_url}"
+                                bot.send_message(channel, message)
                         text = None
                     elif attach['type'] == 'doc':
                         if attach['doc']['ext'] == 'gif':
@@ -72,20 +75,19 @@ def send_new_posts(posts, channel):
                 if len(photo_group) != 0:       #  Отправляем изображения группой
                     bot.send_media_group(channel, photo_group)
                 if len(video_group) != 0:       #   Отправляем видео группой
-                    print('here')
                     bot.send_media_group(channel, video_group)
                 if text_to_send is not None:
                     text = text_to_send
             if text is not None and len(text) != 0:
                 bot.send_message(channel, text)
             logging.info(f"VK post with id{post['id']} from owner_id={post['owner_id']} was sent")
-        # except Exception as ex:
-        #     logging.warning(f'Error "{ex}" of send post id{post["id"]} from owner_id={post["owner_id"]} . Переход к следующему...')
+        except Exception as ex:
+            print(ex)
+            logging.warning(f'Error "{ex}" of send post id{post["id"]} from owner_id={post["owner_id"]} . Переход к следующему...')
         finally:
             # Ждём, чтобы telegram-api не заблокировал за большое кол-во запросов
             time.sleep(32)
     return
-
 
 '''
     check_new_posts проверяет наличие полученных от vk api постов в числе уже размещённых в телеграмм канале,
@@ -161,5 +163,7 @@ def get_video_player_url(owner_id, video_id, video_key):
         'count':config.COUNT_OF_POSTS,
         'v':config.VK_API_VERSION,
     }).json()
-    print(data)
+
     return data['response']['items'][0]['player']
+
+#s = get_video_player_url(-216061606, 456239020, "7cf257fd1a05a41464")

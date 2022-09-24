@@ -12,6 +12,6 @@ if __name__ == '__main__':
             if tgBot.check_new_posts(vk_club, tg_channel) == "Created new file":
                 tgBot.check_new_posts(vk_club, tg_channel)
         logging.info('[App] Script went to sleep.')
-        time.sleep(60 * config.TIMESTEP)
+        time.sleep(config.TIMESTEP)
     logging.info('[App] Script exited.\n')
 
