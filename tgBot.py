@@ -53,12 +53,17 @@ def send_new_posts(posts, channel):
                         else:
                             try:
                                 video_path = download_video_from_vk(video['owner_id'], video['id'], video['title'])
-                                with open(video_path, 'rb') as video_file: video_byte_data = video_file.read()
-                                video_group.append(telebot.types.InputMediaVideo(video_byte_data, caption=text))
-                                os.remove(video_path)
+                                if video_path is not None:
+                                    with open(video_path, 'rb') as video_file: video_byte_data = video_file.read()
+                                    video_group.append(telebot.types.InputMediaVideo(video_byte_data, caption=text))
+                                    os.remove(video_path)
                             except urllib.error.HTTPError:
-                                message = f"Ошибка при загрузке видео с сервера ВКонтакте\nВидео можно открыть по ссылке:\n\n{video['title']}\n{player_url}"
-                                bot.send_message(channel, message)
+                                bot.send_message(channel,
+                                    f"Ошибка при загрузке видео с сервера ВКонтакте\nВидео можно открыть по ссылке:\n\n{video['title']}\n{player_url}")
+                            except AttributeError:
+                                bot.send_message(channel, f'Доступ к видео "{video["title"]}" закрыт')
+                            except:
+                                print('here')
                         text = None
                     elif attach['type'] == 'doc':
                         if attach['doc']['ext'] == 'gif':
@@ -166,4 +171,3 @@ def get_video_player_url(owner_id, video_id, video_key):
 
     return data['response']['items'][0]['player']
 
-#s = get_video_player_url(-216061606, 456239020, "7cf257fd1a05a41464")

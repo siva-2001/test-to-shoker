@@ -1,15 +1,11 @@
 import os
 
 VK_CLUB_TG_CHANNEL_PAIRS = [
-    #('rememberthisphoto','@testChannelForMyIBot'),
     ('testclubforinterview','@testChannelForMyIBot'),
 ]
 
 VK_ACCESS_TOKEN = os.environ.get("VK_ACCESS_TOKEN")
-#    "vk1.a.Hg2J2sRnvli8KAIbg7k2JDNiEkr6cmsGYl1Es0Cg1C89abGD75vGCxYJyylNWCWkRaZ-kEGMX0qt-9cKYp4PfKLW8F8dQG_bYdAXUIeYiANX68KaB7-WKpDNF9J2RI3R6MWX-63bcymI33w-imLnQy5OlGblp1HCgZcL0euOrE3rY6Rqhlpc12qC9giOtjTb"
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
-#    "5753288620:AAFLKHQ7U5cIpABJZsKuzwWbtkbHzUkU3vg"
-
 
 TIMEOUT = 8
     # Время, по истечении которого при отсутствии ответа запрос к VK-api прерывается, в секундах
